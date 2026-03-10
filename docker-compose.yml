@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  devcontainer:
+    container_name: claude-devcontainer
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TZ: ${TZ:-America/Los_Angeles}
+    volumes:
+      # Mount repos at SAME path as host for session sharing
+      - /home/tam/repos:/home/tam/repos:cached
+      # Persist bash history
+      - claude-code-bashhistory:/commandhistory
+      # Share Claude config with host - mount at SAME path as host
+      - /home/tam/.claude:/home/tam/.claude:cached
+      # X11 for clipboard
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
+      # Machine ID for Claude to recognize this as the same device
+      - /etc/machine-id:/etc/machine-id:ro
+      # Docker socket for Docker-out-of-Docker (run docker from inside container)
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Git identity and SSH keys from host
+      - /home/tam/.gitconfig:/home/tam/.gitconfig:ro
+      - /home/tam/.ssh:/home/tam/.ssh:ro
+    working_dir: /home/tam/repos
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=2048
+      - CLAUDE_CONFIG_DIR=/home/tam/.claude
+      - HOME=/home/tam
+      - POWERLEVEL9K_DISABLE_GITSTATUS=true
+      - DISPLAY=${DISPLAY:-:0}
+      - TERM=xterm-256color
+      - CARGO_HOME=/home/tam/.cargo
+      - RUSTUP_HOME=/home/tam/.cargo
+    # Required for iptables/firewall rules
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    # Memory limits - leave ~4GB for host OS
+    mem_limit: 28g
+    memswap_limit: 28g
+    # Container starts on-demand via claude-session.sh ensure_container()
+    restart: "no"
+    # Keep container running
+    command: tail -f /dev/null
+
+volumes:
+  claude-code-bashhistory:
