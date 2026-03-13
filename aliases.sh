@@ -60,3 +60,6 @@ alias claude-shell='docker exec -it claude-devcontainer zsh'
 
 # Quick status
 alias claude-status='docker ps --filter name=claude-devcontainer --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
+
+# Telegram controller bot
+alias claude-telegram='/home/tam/repos/.devcontainer/telegram-bot/start.sh'

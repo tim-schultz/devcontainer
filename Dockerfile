@@ -1,4 +1,4 @@
-FROM node:lts
+FROM node:24
 
 ARG TZ=America/Los_Angeles
 ENV TZ="$TZ"
