@@ -1,6 +1,6 @@
 #!/bin/bash
 # Claude Dev Container - Login Message
-# Add to ~/.bashrc: source /home/tam/repos/.devcontainer/motd.sh
+# Add to ~/.bashrc: source /path/to/.devcontainer/motd.sh
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'

@@ -96,6 +96,28 @@ else
     echo "  Create $TELEGRAM_ENV with TELEGRAM_BOT_TOKEN=<token> to enable"
 fi
 
+# Generate workspace CLAUDE.md with machine-specific paths
+CLAUDE_MD="$REPOS_DIR/CLAUDE.md"
+cat > "$CLAUDE_MD" <<EOF
+# Workspace: $REPOS_DIR
+
+## Environment
+
+- You are inside a devcontainer. Your HOME is \`$HOST_HOME\` (NOT \`/home/node\`).
+- Never write files to \`/home/node\` — it is not volume-mounted to the host.
+
+## File Sharing Between Projects
+
+- **Shared directory:** \`$REPOS_DIR/.shared/\` — use this for any files that need to be visible to other agents, projects, or the user (plans, specs, data exports, etc.)
+  - Plans and specs: \`$REPOS_DIR/.shared/plans/\`
+- **Project files** stay in their project directory: \`$REPOS_DIR/<project>/\`
+- When referencing files for another person or agent, always use absolute paths under \`$REPOS_DIR/\`
+EOF
+
+# Create shared directories
+mkdir -p "$REPOS_DIR/.shared/plans"
+
+echo -e "${GREEN}Generated CLAUDE.md at $CLAUDE_MD${NC}"
 echo ""
 echo -e "${GREEN}Setup complete.${NC} Next steps:"
 echo "  1. source aliases.sh    # Add to ~/.bashrc or ~/.zshrc"
