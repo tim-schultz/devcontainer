@@ -141,5 +141,31 @@ ARG CLAUDE_CACHE_BUST=1
 RUN curl -fsSL https://claude.ai/install.sh | bash && \
     sudo cp /home/node/.local/bin/claude /usr/local/bin/claude
 
+# Install TinyClaw for multi-agent orchestration
+# Installed to /opt/tinyclaw (safe from volume mount clobbering)
+# Bump TINYCLAW_CACHE_BUST to force re-clone on rebuild
+ARG TINYCLAW_CACHE_BUST=1
+USER root
+RUN git clone --depth 1 https://github.com/TinyAGI/tinyclaw.git /opt/tinyclaw && \
+    chown -R node:node /opt/tinyclaw
+USER node
+RUN cd /opt/tinyclaw && PUPPETEER_SKIP_DOWNLOAD=true npm install && \
+    mkdir -p /home/tam/.tinyclaw
+
+# Patch: stub missing updateAgentTeammates export (upstream bug in TinyClaw cli/team.ts)
+RUN echo 'export function updateAgentTeammates(_dir: string, _id: string, _agents: Record<string, any>, _teams: Record<string, any>): void {}' \
+    >> /opt/tinyclaw/packages/core/src/agent.ts
+
+# Build TypeScript and create CLI symlink
+# Skip install.sh (installs to /home/node/.local/bin which is wrong with HOME=/home/tam)
+# Instead, symlink directly to /usr/local/bin so it's always on PATH
+RUN cd /opt/tinyclaw && npm run build && \
+    sudo ln -sf /opt/tinyclaw/bin/tinyclaw /usr/local/bin/tinyclaw
+
+# Copy entrypoint and setup scripts
+COPY --chown=node:node container-entrypoint.sh /home/tam/container-entrypoint.sh
+COPY --chown=node:node tinyclaw-setup.sh /home/tam/tinyclaw-setup.sh
+RUN chmod +x /home/tam/container-entrypoint.sh /home/tam/tinyclaw-setup.sh
+
 # Copy tmux config for mouse scrolling
 COPY --chown=node:node tmux.conf /home/tam/.tmux.conf

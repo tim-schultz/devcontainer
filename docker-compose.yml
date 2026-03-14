@@ -24,6 +24,14 @@ services:
       # Git identity and SSH keys from host
       - /home/tam/.gitconfig:/home/tam/.gitconfig:ro
       - /home/tam/.ssh:/home/tam/.ssh:ro
+      # TinyClaw state persistence (settings, SQLite queue, sender data)
+      - tinyclaw-data:/home/tam/.tinyclaw
+      # Catch stray writes to /home/node (container user's actual home)
+      - node-home-data:/home/node
+    ports:
+      # TinyOffice web portal and API (localhost only for security)
+      - "127.0.0.1:3100:3000"
+      - "127.0.0.1:3777:3777"
     working_dir: /home/tam/repos
     environment:
       - NODE_OPTIONS=--max-old-space-size=2048
@@ -43,8 +51,10 @@ services:
     memswap_limit: 28g
     # Container starts on-demand via claude-session.sh ensure_container()
     restart: "no"
-    # Keep container running
-    command: tail -f /dev/null
+    # Auto-start TinyClaw, then keep container running
+    command: /home/tam/container-entrypoint.sh
 
 volumes:
   claude-code-bashhistory:
+  tinyclaw-data:
+  node-home-data:

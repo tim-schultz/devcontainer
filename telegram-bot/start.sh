@@ -1,6 +1,10 @@
 #!/bin/bash
-# Start the Claude Dev Container Telegram bot
-# Runs on the host machine (not inside the container)
+# DEPRECATED: This custom Telegram bot has been replaced by TinyClaw's built-in Telegram channel.
+# Use 'tc-start' to start TinyClaw (includes Telegram support).
+# This script is kept for reference only.
+echo "DEPRECATED: Use TinyClaw instead. Run 'tc-start' or 'tinyclaw start' inside the container."
+echo "See: .devcontainer/PLAN-tinyclaw-integration.md"
+exit 1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"

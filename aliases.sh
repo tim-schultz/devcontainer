@@ -21,6 +21,14 @@ if [[ $- == *i* ]]; then
     echo -e "\033[0;36m║\033[0m    cs-branches <proj>      List worktrees                  \033[0;36m║\033[0m"
     echo -e "\033[0;36m║\033[0m    cs-branch-rm <proj> <br> Remove worktree                \033[0;36m║\033[0m"
     echo -e "\033[0;36m║\033[0m                                                            \033[0;36m║\033[0m"
+    echo -e "\033[0;36m║\033[0m  \033[1;33mTinyClaw (Multi-Agent):\033[0m                                    \033[0;36m║\033[0m"
+    echo -e "\033[0;36m║\033[0m    tc-status               Agent system status             \033[0;36m║\033[0m"
+    echo -e "\033[0;36m║\033[0m    tc-start / tc-stop      Start/stop TinyClaw             \033[0;36m║\033[0m"
+    echo -e "\033[0;36m║\033[0m    tc-agents               List agents                     \033[0;36m║\033[0m"
+    echo -e "\033[0;36m║\033[0m    tc-teams                List teams                      \033[0;36m║\033[0m"
+    echo -e "\033[0;36m║\033[0m    tc-office               Start web portal (:3000)        \033[0;36m║\033[0m"
+    echo -e "\033[0;36m║\033[0m    tc-approve <code>       Approve Telegram sender         \033[0;36m║\033[0m"
+    echo -e "\033[0;36m║\033[0m                                                            \033[0;36m║\033[0m"
     echo -e "\033[0;36m║\033[0m  \033[1;33mContainer:\033[0m                                                \033[0;36m║\033[0m"
     echo -e "\033[0;36m║\033[0m    claude-build            Build container image           \033[0;36m║\033[0m"
     echo -e "\033[0;36m║\033[0m    claude-up               Start container                 \033[0;36m║\033[0m"
@@ -61,5 +69,16 @@ alias claude-shell='docker exec -it claude-devcontainer zsh'
 # Quick status
 alias claude-status='docker ps --filter name=claude-devcontainer --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
 
-# Telegram controller bot
-alias claude-telegram='/home/tam/repos/.devcontainer/telegram-bot/start.sh'
+# TinyClaw multi-agent management
+alias tc='docker exec -it claude-devcontainer tinyclaw'
+alias tc-start='docker exec -it claude-devcontainer tinyclaw start'
+alias tc-stop='docker exec -it claude-devcontainer tinyclaw stop'
+alias tc-restart='docker exec -it claude-devcontainer tinyclaw restart'
+alias tc-status='docker exec -it claude-devcontainer tinyclaw status'
+alias tc-logs='docker exec -it claude-devcontainer tinyclaw logs'
+alias tc-attach='docker exec -it claude-devcontainer tinyclaw attach'
+alias tc-office='docker exec -it claude-devcontainer tinyclaw office'
+alias tc-agents='docker exec claude-devcontainer tinyclaw agent list'
+alias tc-teams='docker exec claude-devcontainer tinyclaw team list'
+alias tc-approve='docker exec claude-devcontainer tinyclaw pairing approve'
+alias tc-pairing='docker exec claude-devcontainer tinyclaw pairing pending'
