@@ -16,6 +16,11 @@
 
 CONTAINER_NAME="claude-devcontainer"
 
+# Derive paths from script location (portable across machines)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPOS_DIR="$(dirname "$SCRIPT_DIR")"
+COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
+
 # Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -25,7 +30,7 @@ NC='\033[0m' # No Color
 ensure_container() {
     if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
         echo -e "${YELLOW}Starting container...${NC}"
-        docker compose -f /home/tam/repos/.devcontainer/docker-compose.yml up -d
+        docker compose -f "$COMPOSE_FILE" up -d
         sleep 2
     fi
 }
@@ -43,7 +48,7 @@ list_sessions() {
         echo -e "  ${YELLOW}No active sessions${NC}"
     fi
     echo ""
-    echo "Attach with: ./claude-session.sh <project> [feature]"
+    echo "Attach with: cs <project> [feature]"
 }
 
 kill_session() {
@@ -71,10 +76,10 @@ start_or_attach() {
     ensure_container
 
     # Check if project directory exists
-    if ! docker exec $CONTAINER_NAME test -d "/home/tam/repos/$project"; then
-        echo -e "${YELLOW}Warning: /home/tam/repos/$project does not exist${NC}"
+    if ! docker exec $CONTAINER_NAME test -d "$REPOS_DIR/$project"; then
+        echo -e "${YELLOW}Warning: $REPOS_DIR/$project does not exist${NC}"
         echo "Available projects:"
-        docker exec $CONTAINER_NAME ls /home/tam/repos | head -20
+        docker exec $CONTAINER_NAME ls "$REPOS_DIR" | head -20
         exit 1
     fi
 
@@ -84,9 +89,9 @@ start_or_attach() {
         docker exec -it $CONTAINER_NAME tmux attach -t "$SESSION_NAME"
     else
         echo -e "${GREEN}Creating new session: $SESSION_NAME${NC}"
-        echo -e "${BLUE}Project: /home/tam/repos/$project${NC}"
+        echo -e "${BLUE}Project: $REPOS_DIR/$project${NC}"
         [ -n "$feature" ] && echo -e "${BLUE}Feature: $feature${NC}"
-        docker exec -it $CONTAINER_NAME tmux new-session -s "$SESSION_NAME" -c "/home/tam/repos/$project" "claude --dangerously-skip-permissions; zsh"
+        docker exec -it $CONTAINER_NAME tmux new-session -s "$SESSION_NAME" -c "$REPOS_DIR/$project" "claude --dangerously-skip-permissions; zsh"
     fi
 }
 
@@ -96,13 +101,13 @@ start_worktree_session() {
     local branch=$2
 
     if [ -z "$branch" ]; then
-        echo "Usage: ./claude-session.sh branch <project> <branch>"
+        echo "Usage: cs-branch <project> <branch>"
         exit 1
     fi
 
     SESSION_NAME="${project}@${branch}"
-    WORKTREE_DIR="/home/tam/repos/${project}-${branch}"
-    PROJECT_DIR="/home/tam/repos/${project}"
+    WORKTREE_DIR="$REPOS_DIR/${project}-${branch}"
+    PROJECT_DIR="$REPOS_DIR/${project}"
 
     ensure_container
 
@@ -145,12 +150,12 @@ start_worktree_session() {
 # List worktrees for a project
 list_worktrees() {
     local project=$1
-    PROJECT_DIR="/home/tam/repos/${project}"
+    PROJECT_DIR="$REPOS_DIR/${project}"
 
     ensure_container
 
     if [ -z "$project" ]; then
-        echo "Usage: ./claude-session.sh branches <project>"
+        echo "Usage: cs-branches <project>"
         exit 1
     fi
 
@@ -165,12 +170,12 @@ remove_worktree() {
     local branch=$2
 
     if [ -z "$branch" ]; then
-        echo "Usage: ./claude-session.sh branch-rm <project> <branch>"
+        echo "Usage: cs-branch-rm <project> <branch>"
         exit 1
     fi
 
-    WORKTREE_DIR="/home/tam/repos/${project}-${branch}"
-    PROJECT_DIR="/home/tam/repos/${project}"
+    WORKTREE_DIR="$REPOS_DIR/${project}-${branch}"
+    PROJECT_DIR="$REPOS_DIR/${project}"
     SESSION_NAME="${project}@${branch}"
 
     ensure_container
@@ -205,10 +210,10 @@ start_remote() {
     ensure_container
 
     # Check if project directory exists
-    if ! docker exec $CONTAINER_NAME test -d "/home/tam/repos/$project"; then
-        echo -e "${YELLOW}Warning: /home/tam/repos/$project does not exist${NC}"
+    if ! docker exec $CONTAINER_NAME test -d "$REPOS_DIR/$project"; then
+        echo -e "${YELLOW}Warning: $REPOS_DIR/$project does not exist${NC}"
         echo "Available projects:"
-        docker exec $CONTAINER_NAME ls /home/tam/repos | head -20
+        docker exec $CONTAINER_NAME ls "$REPOS_DIR" | head -20
         exit 1
     fi
 
@@ -218,10 +223,10 @@ start_remote() {
         docker exec -it $CONTAINER_NAME tmux attach -t "$SESSION_NAME"
     else
         echo -e "${GREEN}Creating new remote control session: $SESSION_NAME${NC}"
-        echo -e "${BLUE}Project: /home/tam/repos/$project${NC}"
+        echo -e "${BLUE}Project: $REPOS_DIR/$project${NC}"
         [ -n "$feature" ] && echo -e "${BLUE}Feature: $feature${NC}"
         echo -e "${YELLOW}If this is the first time, accept the trust dialog then /exit — remote control will start automatically.${NC}"
-        docker exec -it $CONTAINER_NAME tmux new-session -s "$SESSION_NAME" -c "/home/tam/repos/$project" "claude && claude remote-control; zsh"
+        docker exec -it $CONTAINER_NAME tmux new-session -s "$SESSION_NAME" -c "$REPOS_DIR/$project" "claude && claude remote-control; zsh"
     fi
 }
 
@@ -232,14 +237,14 @@ case "$1" in
         ;;
     kill|rm)
         if [ -z "$2" ]; then
-            echo "Usage: ./claude-session.sh kill <session-name>"
+            echo "Usage: cs-kill <session-name>"
             exit 1
         fi
         kill_session "$2"
         ;;
     remote|rc)
         if [ -z "$2" ]; then
-            echo "Usage: ./claude-session.sh remote <project> [feature]"
+            echo "Usage: cs-remote <project> [feature]"
             exit 1
         fi
         start_remote "$2" "$3"
@@ -257,30 +262,22 @@ case "$1" in
         echo "Claude Code Session Manager"
         echo ""
         echo "Usage:"
-        echo "  ./claude-session.sh <project> [feature]      Start/attach to session"
-        echo "  ./claude-session.sh remote <project> [feature]  Start remote control session"
-        echo "  ./claude-session.sh list                     List all sessions"
-        echo "  ./claude-session.sh kill <session-name>      Kill a session"
+        echo "  cs <project> [feature]                Start/attach to session"
+        echo "  cs-remote <project> [feature]         Start remote control session"
+        echo "  cs-list                               List all sessions"
+        echo "  cs-kill <session-name>                Kill a session"
         echo ""
         echo "Branch Worktrees:"
-        echo "  ./claude-session.sh branch <project> <branch>    Start session on branch"
-        echo "  ./claude-session.sh branches <project>           List worktrees"
-        echo "  ./claude-session.sh branch-rm <project> <branch> Remove worktree"
-        echo ""
-        echo "Examples:"
-        echo "  ./claude-session.sh long-running-agents"
-        echo "  ./claude-session.sh long-running-agents api-fix"
-        echo "  ./claude-session.sh remote myproject"
-        echo "  ./claude-session.sh branch myproject feature-xyz"
-        echo "  ./claude-session.sh branches myproject"
-        echo "  ./claude-session.sh branch-rm myproject feature-xyz"
+        echo "  cs-branch <project> <branch>          Start session on branch"
+        echo "  cs-branches <project>                 List worktrees"
+        echo "  cs-branch-rm <project> <branch>       Remove worktree"
         ;;
     "")
-        echo "Usage: ./claude-session.sh <project> [feature]"
-        echo "       ./claude-session.sh remote <project> [feature]"
-        echo "       ./claude-session.sh branch <project> <branch>"
-        echo "       ./claude-session.sh list"
-        echo "       ./claude-session.sh --help"
+        echo "Usage: cs <project> [feature]"
+        echo "       cs-remote <project> [feature]"
+        echo "       cs-branch <project> <branch>"
+        echo "       cs-list"
+        echo "       cs --help"
         exit 1
         ;;
     *)

@@ -1,6 +1,7 @@
 FROM node:24
 
 ARG TZ=America/Los_Angeles
+ARG HOST_HOME=/home/user
 ENV TZ="$TZ"
 
 # Install basic development tools, SSH server, and networking tools
@@ -56,11 +57,11 @@ ENV DEVCONTAINER=true
 
 # Create directories to match host paths exactly
 # Also create .zshrc to prevent zsh-newuser-install prompt
-RUN mkdir -p /home/tam/repos /home/tam/.claude /home/tam/.cargo /home/tam/go && \
-    touch /home/tam/.zshrc && \
-    chown -R node:node /home/tam
+RUN mkdir -p ${HOST_HOME}/repos ${HOST_HOME}/.claude ${HOST_HOME}/.cargo ${HOST_HOME}/go && \
+    touch ${HOST_HOME}/.zshrc && \
+    chown -R node:node ${HOST_HOME}
 
-WORKDIR /home/tam/repos
+WORKDIR ${HOST_HOME}/repos
 
 # Install git-delta for better diffs
 ARG GIT_DELTA_VERSION=0.18.2
@@ -91,22 +92,22 @@ RUN ARCH=$(dpkg --print-architecture) && \
 # Set up non-root user for remaining operations
 USER node
 
-# Set Rust and uv to install to /home/tam (matching HOME in docker-compose)
-ENV CARGO_HOME=/home/tam/.cargo
-ENV RUSTUP_HOME=/home/tam/.cargo
+# Set Rust and uv to install to HOST_HOME (matching HOME in docker-compose)
+ENV CARGO_HOME=${HOST_HOME}/.cargo
+ENV RUSTUP_HOME=${HOST_HOME}/.cargo
 
 # Install Rust via rustup (as node user)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
 
 # Install uv for Python project management (as node user)
 # UV_INSTALL_DIR sets the directory for the binary
-RUN mkdir -p /home/tam/.local/bin && \
-    curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/home/tam/.local/bin sh
+RUN mkdir -p ${HOST_HOME}/.local/bin && \
+    curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=${HOST_HOME}/.local/bin sh
 
 # Install global npm packages
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
-ENV GOPATH=/home/tam/go
-ENV PATH="/home/tam/.cargo/bin:/home/tam/.local/bin:/usr/local/share/npm-global/bin:/usr/local/go/bin:/home/tam/go/bin:$PATH"
+ENV GOPATH=${HOST_HOME}/go
+ENV PATH="${HOST_HOME}/.cargo/bin:${HOST_HOME}/.local/bin:/usr/local/share/npm-global/bin:/usr/local/go/bin:${HOST_HOME}/go/bin:$PATH"
 
 # Set shell preferences and TERM for proper scrolling
 ENV SHELL=/bin/zsh
@@ -114,7 +115,7 @@ ENV EDITOR=nano
 ENV VISUAL=nano
 ENV TERM=xterm-256color
 
-# Install zsh with plugins (installs to /home/node, we'll copy to /home/tam)
+# Install zsh with plugins (installs to /home/node, we'll copy to HOST_HOME)
 ARG ZSH_IN_DOCKER_VERSION=1.2.0
 RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v${ZSH_IN_DOCKER_VERSION}/zsh-in-docker.sh)" -- \
     -p git \
@@ -122,10 +123,10 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
     -a "source /usr/share/doc/fzf/examples/key-bindings.zsh 2>/dev/null || true" \
     -a "source /usr/share/doc/fzf/examples/completion.zsh 2>/dev/null || true" \
     -a "export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
-    -a "export PATH=\$PATH:/home/tam/.local/bin:/home/tam/.cargo/bin:/usr/local/go/bin:/home/tam/go/bin" \
-    -a "source /home/tam/.cargo/env 2>/dev/null || true" \
+    -a "export PATH=\$PATH:\$HOME/.local/bin:\$HOME/.cargo/bin:/usr/local/go/bin:\$HOME/go/bin" \
+    -a "source \$HOME/.cargo/env 2>/dev/null || true" \
     -x && \
-    cp /home/node/.zshrc /home/tam/.zshrc
+    cp /home/node/.zshrc ${HOST_HOME}/.zshrc
 
 # Install common TypeScript tools
 RUN npm install -g \
@@ -150,22 +151,22 @@ RUN git clone --depth 1 https://github.com/TinyAGI/tinyclaw.git /opt/tinyclaw &&
     chown -R node:node /opt/tinyclaw
 USER node
 RUN cd /opt/tinyclaw && PUPPETEER_SKIP_DOWNLOAD=true npm install && \
-    mkdir -p /home/tam/.tinyclaw
+    mkdir -p ${HOST_HOME}/.tinyclaw
 
 # Patch: stub missing updateAgentTeammates export (upstream bug in TinyClaw cli/team.ts)
 RUN echo 'export function updateAgentTeammates(_dir: string, _id: string, _agents: Record<string, any>, _teams: Record<string, any>): void {}' \
     >> /opt/tinyclaw/packages/core/src/agent.ts
 
 # Build TypeScript and create CLI symlink
-# Skip install.sh (installs to /home/node/.local/bin which is wrong with HOME=/home/tam)
+# Skip install.sh (installs to /home/node/.local/bin which is wrong with custom HOME)
 # Instead, symlink directly to /usr/local/bin so it's always on PATH
 RUN cd /opt/tinyclaw && npm run build && \
     sudo ln -sf /opt/tinyclaw/bin/tinyclaw /usr/local/bin/tinyclaw
 
 # Copy entrypoint and setup scripts
-COPY --chown=node:node container-entrypoint.sh /home/tam/container-entrypoint.sh
-COPY --chown=node:node tinyclaw-setup.sh /home/tam/tinyclaw-setup.sh
-RUN chmod +x /home/tam/container-entrypoint.sh /home/tam/tinyclaw-setup.sh
+COPY --chown=node:node container-entrypoint.sh ${HOST_HOME}/container-entrypoint.sh
+COPY --chown=node:node tinyclaw-setup.sh ${HOST_HOME}/tinyclaw-setup.sh
+RUN chmod +x ${HOST_HOME}/container-entrypoint.sh ${HOST_HOME}/tinyclaw-setup.sh
 
 # Copy tmux config for mouse scrolling
-COPY --chown=node:node tmux.conf /home/tam/.tmux.conf
+COPY --chown=node:node tmux.conf ${HOST_HOME}/.tmux.conf

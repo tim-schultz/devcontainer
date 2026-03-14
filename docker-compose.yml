@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   devcontainer:
     container_name: claude-devcontainer
@@ -8,51 +6,49 @@ services:
       dockerfile: Dockerfile
       args:
         TZ: ${TZ:-America/Los_Angeles}
+        HOST_HOME: ${HOST_HOME}
     volumes:
       # Mount repos at SAME path as host for session sharing
-      - /home/tam/repos:/home/tam/repos:cached
+      - ${REPOS_DIR}:${REPOS_DIR}:cached
       # Persist bash history
       - claude-code-bashhistory:/commandhistory
-      # Share Claude config with host - mount at SAME path as host
-      - /home/tam/.claude:/home/tam/.claude:cached
-      # X11 for clipboard
-      - /tmp/.X11-unix:/tmp/.X11-unix:ro
-      # Machine ID for Claude to recognize this as the same device
-      - /etc/machine-id:/etc/machine-id:ro
-      # Docker socket for Docker-out-of-Docker (run docker from inside container)
-      - /var/run/docker.sock:/var/run/docker.sock
+      # Share Claude config with host
+      - ${HOST_HOME}/.claude:${HOST_HOME}/.claude:cached
+      # Docker socket (platform-detected by setup.sh)
+      - ${DOCKER_SOCK}:/var/run/docker.sock
       # Git identity and SSH keys from host
-      - /home/tam/.gitconfig:/home/tam/.gitconfig:ro
-      - /home/tam/.ssh:/home/tam/.ssh:ro
+      - ${HOST_HOME}/.gitconfig:${HOST_HOME}/.gitconfig:ro
+      - ${HOST_HOME}/.ssh:${HOST_HOME}/.ssh:ro
       # TinyClaw state persistence (settings, SQLite queue, sender data)
-      - tinyclaw-data:/home/tam/.tinyclaw
+      - tinyclaw-data:${HOST_HOME}/.tinyclaw
       # Catch stray writes to /home/node (container user's actual home)
       - node-home-data:/home/node
     ports:
       # TinyOffice web portal and API (localhost only for security)
       - "127.0.0.1:3100:3000"
       - "127.0.0.1:3777:3777"
-    working_dir: /home/tam/repos
+    working_dir: ${REPOS_DIR}
     environment:
       - NODE_OPTIONS=--max-old-space-size=2048
-      - CLAUDE_CONFIG_DIR=/home/tam/.claude
-      - HOME=/home/tam
+      - CLAUDE_CONFIG_DIR=${HOST_HOME}/.claude
+      - HOME=${HOST_HOME}
+      - REPOS_DIR=${REPOS_DIR}
       - POWERLEVEL9K_DISABLE_GITSTATUS=true
       - DISPLAY=${DISPLAY:-:0}
       - TERM=xterm-256color
-      - CARGO_HOME=/home/tam/.cargo
-      - RUSTUP_HOME=/home/tam/.cargo
+      - CARGO_HOME=${HOST_HOME}/.cargo
+      - RUSTUP_HOME=${HOST_HOME}/.cargo
     # Required for iptables/firewall rules
     cap_add:
       - NET_ADMIN
       - NET_RAW
-    # Memory limits - leave ~4GB for host OS
-    mem_limit: 28g
-    memswap_limit: 28g
+    # Memory limits (detected by setup.sh)
+    mem_limit: ${CONTAINER_MEM:-28g}
+    memswap_limit: ${CONTAINER_MEM:-28g}
     # Container starts on-demand via claude-session.sh ensure_container()
     restart: "no"
     # Auto-start TinyClaw, then keep container running
-    command: /home/tam/container-entrypoint.sh
+    command: ${HOST_HOME}/container-entrypoint.sh
 
 volumes:
   claude-code-bashhistory:

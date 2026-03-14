@@ -1,6 +1,9 @@
 # Claude Dev Container Aliases
 # Add to your ~/.bashrc or ~/.zshrc:
-#   source /home/tam/repos/.devcontainer/aliases.sh
+#   source /path/to/.devcontainer/aliases.sh
+
+# Derive paths from this script's location (portable across machines)
+_DEVCONTAINER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Show help on interactive login
 if [[ $- == *i* ]]; then
@@ -45,24 +48,24 @@ if [[ $- == *i* ]]; then
 fi
 
 # Session management
-alias claude-session='/home/tam/repos/.devcontainer/claude-session.sh'
-alias cs='/home/tam/repos/.devcontainer/claude-session.sh'
-alias cs-list='/home/tam/repos/.devcontainer/claude-session.sh list'
-alias cs-kill='/home/tam/repos/.devcontainer/claude-session.sh kill'
+alias claude-session="$_DEVCONTAINER_DIR/claude-session.sh"
+alias cs="$_DEVCONTAINER_DIR/claude-session.sh"
+alias cs-list="$_DEVCONTAINER_DIR/claude-session.sh list"
+alias cs-kill="$_DEVCONTAINER_DIR/claude-session.sh kill"
 
 # Remote control session
-alias cs-remote='/home/tam/repos/.devcontainer/claude-session.sh remote'
+alias cs-remote="$_DEVCONTAINER_DIR/claude-session.sh remote"
 
 # Branch worktree sessions
-alias cs-branch='/home/tam/repos/.devcontainer/claude-session.sh branch'
-alias cs-branches='/home/tam/repos/.devcontainer/claude-session.sh branches'
-alias cs-branch-rm='/home/tam/repos/.devcontainer/claude-session.sh branch-rm'
+alias cs-branch="$_DEVCONTAINER_DIR/claude-session.sh branch"
+alias cs-branches="$_DEVCONTAINER_DIR/claude-session.sh branches"
+alias cs-branch-rm="$_DEVCONTAINER_DIR/claude-session.sh branch-rm"
 
 # Container management
-alias claude-build='cd /home/tam/repos/.devcontainer && docker compose build'
-alias claude-up='cd /home/tam/repos/.devcontainer && docker compose up -d'
-alias claude-down='cd /home/tam/repos/.devcontainer && docker compose down'
-alias claude-restart='cd /home/tam/repos/.devcontainer && docker compose down && docker compose up -d'
+alias claude-build="cd '$_DEVCONTAINER_DIR' && docker compose build"
+alias claude-up="cd '$_DEVCONTAINER_DIR' && docker compose up -d"
+alias claude-down="cd '$_DEVCONTAINER_DIR' && docker compose down"
+alias claude-restart="cd '$_DEVCONTAINER_DIR' && docker compose down && docker compose up -d"
 alias claude-logs='docker logs -f claude-devcontainer'
 alias claude-shell='docker exec -it claude-devcontainer zsh'
 

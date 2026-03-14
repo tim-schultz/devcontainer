@@ -3,7 +3,8 @@
 # Generates ~/.tinyclaw/settings.json on first boot
 set -e
 
-SETTINGS_FILE="/home/tam/.tinyclaw/settings.json"
+# HOME is set by docker-compose environment
+SETTINGS_FILE="$HOME/.tinyclaw/settings.json"
 
 if [ -f "$SETTINGS_FILE" ]; then
     echo "TinyClaw settings already exist at $SETTINGS_FILE"
@@ -12,11 +13,14 @@ fi
 
 echo "Generating TinyClaw settings..."
 
-mkdir -p /home/tam/.tinyclaw
+mkdir -p "$HOME/.tinyclaw"
+
+# REPOS_DIR is set by docker-compose environment
+REPOS="${REPOS_DIR:-$HOME/repos}"
 
 # Read Telegram bot token from the .env file (not from container env, to avoid leaking to other processes)
 TELEGRAM_TOKEN=""
-ENV_FILE="/home/tam/repos/.devcontainer/telegram-bot/.env"
+ENV_FILE="$REPOS/.devcontainer/telegram-bot/.env"
 if [ -f "$ENV_FILE" ]; then
     TELEGRAM_TOKEN=$(grep -E '^TELEGRAM_BOT_TOKEN=' "$ENV_FILE" | cut -d'=' -f2- | tr -d '[:space:]')
 fi
@@ -37,7 +41,7 @@ cat > "$SETTINGS_FILE" <<EOF
     $TELEGRAM_CONFIG
   },
   "workspace": {
-    "path": "/home/tam/repos",
+    "path": "$REPOS",
     "name": "repos"
   },
   "agents": {
@@ -45,8 +49,8 @@ cat > "$SETTINGS_FILE" <<EOF
       "name": "Default Agent",
       "provider": "anthropic",
       "model": "sonnet",
-      "working_directory": "/home/tam/repos/default",
-      "system_prompt": "You are a routing agent in a devcontainer at /home/tam/repos. All projects are already set up — do NOT attempt to install, configure, or scaffold anything. On first message, run 'ls /home/tam/repos' to see available projects. Wait for the user to tell you which project to work on. Keep responses brief.\n\nIMPORTANT: Your HOME is /home/tam (NOT /home/node). Never write files to /home/node.\n\nShared files: Use /home/tam/repos/.shared/ for any files that need to be visible to other agents or the user. Plans go in /home/tam/repos/.shared/plans/. Project-specific files stay in the project directory under /home/tam/repos/<project>/."
+      "working_directory": "$REPOS/default",
+      "system_prompt": "You are a routing agent in a devcontainer at $REPOS. All projects are already set up — do NOT attempt to install, configure, or scaffold anything. On first message, run 'ls $REPOS' to see available projects. Wait for the user to tell you which project to work on. Keep responses brief.\n\nIMPORTANT: Your HOME is $HOME (NOT /home/node). Never write files to /home/node.\n\nShared files: Use $REPOS/.shared/ for any files that need to be visible to other agents or the user. Plans go in $REPOS/.shared/plans/. Project-specific files stay in the project directory under $REPOS/<project>/."
     }
   },
   "teams": {},
