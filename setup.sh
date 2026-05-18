@@ -117,6 +117,10 @@ EOF
 # Create shared directories
 mkdir -p "$REPOS_DIR/.shared/plans"
 
+# Ensure agent config dirs exist on host before docker-compose mounts them
+# (otherwise docker auto-creates them as root-owned)
+mkdir -p "$HOST_HOME/.claude" "$HOST_HOME/.codex"
+
 echo -e "${GREEN}Generated CLAUDE.md at $CLAUDE_MD${NC}"
 echo ""
 echo -e "${GREEN}Setup complete.${NC} Next steps:"

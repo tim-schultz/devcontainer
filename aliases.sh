@@ -24,6 +24,12 @@ if [[ $- == *i* ]]; then
     echo -e "\033[0;36m║\033[0m    cs-branches <proj>      List worktrees                  \033[0;36m║\033[0m"
     echo -e "\033[0;36m║\033[0m    cs-branch-rm <proj> <br> Remove worktree                \033[0;36m║\033[0m"
     echo -e "\033[0;36m║\033[0m                                                            \033[0;36m║\033[0m"
+    echo -e "\033[0;36m║\033[0m  \033[1;33mCodex Sessions (sibling of cs):\033[0m                           \033[0;36m║\033[0m"
+    echo -e "\033[0;36m║\033[0m    cx <project> [feature]  Start/attach Codex session      \033[0;36m║\033[0m"
+    echo -e "\033[0;36m║\033[0m    cx-list                 List active Codex sessions      \033[0;36m║\033[0m"
+    echo -e "\033[0;36m║\033[0m    cx-kill <name>          Kill a Codex session            \033[0;36m║\033[0m"
+    echo -e "\033[0;36m║\033[0m    cx-branch <proj> <br>   Codex session on branch         \033[0;36m║\033[0m"
+    echo -e "\033[0;36m║\033[0m                                                            \033[0;36m║\033[0m"
     echo -e "\033[0;36m║\033[0m  \033[1;33mTinyClaw (Multi-Agent):\033[0m                                    \033[0;36m║\033[0m"
     echo -e "\033[0;36m║\033[0m    tc-status               Agent system status             \033[0;36m║\033[0m"
     echo -e "\033[0;36m║\033[0m    tc-start / tc-stop      Start/stop TinyClaw             \033[0;36m║\033[0m"
@@ -60,6 +66,15 @@ alias cs-remote="$_DEVCONTAINER_DIR/claude-session.sh remote"
 alias cs-branch="$_DEVCONTAINER_DIR/claude-session.sh branch"
 alias cs-branches="$_DEVCONTAINER_DIR/claude-session.sh branches"
 alias cs-branch-rm="$_DEVCONTAINER_DIR/claude-session.sh branch-rm"
+
+# Codex CLI sessions (sibling of cs — sessions get a ~codex suffix)
+alias codex-session="$_DEVCONTAINER_DIR/codex-session.sh"
+alias cx="$_DEVCONTAINER_DIR/codex-session.sh"
+alias cx-list="$_DEVCONTAINER_DIR/codex-session.sh list"
+alias cx-kill="$_DEVCONTAINER_DIR/codex-session.sh kill"
+alias cx-branch="$_DEVCONTAINER_DIR/codex-session.sh branch"
+alias cx-branches="$_DEVCONTAINER_DIR/codex-session.sh branches"
+alias cx-branch-rm="$_DEVCONTAINER_DIR/codex-session.sh branch-rm"
 
 # Container management
 alias claude-build="cd '$_DEVCONTAINER_DIR' && docker compose build"

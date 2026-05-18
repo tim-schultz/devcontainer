@@ -7,6 +7,21 @@ export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/share/npm-global/bin:/
 
 echo "=== Container starting (HOME=$HOME) ==="
 
+# Ensure codex skill is installed (idempotent — skip if already present)
+if [ ! -d "$HOME/.claude/skills/codex" ]; then
+    echo "Installing codex skill..."
+    SKILLS_TMP=$(mktemp -d)
+    if git clone --depth 1 https://github.com/skills-directory/skill-codex.git "$SKILLS_TMP" 2>/dev/null \
+        || git clone --depth 1 git@github.com:skills-directory/skill-codex.git "$SKILLS_TMP" 2>/dev/null; then
+        mkdir -p "$HOME/.claude/skills"
+        cp -r "$SKILLS_TMP/plugins/skill-codex/skills/codex" "$HOME/.claude/skills/codex"
+        echo "codex skill installed at $HOME/.claude/skills/codex"
+    else
+        echo "WARNING: failed to clone skill-codex — codex skill not installed"
+    fi
+    rm -rf "$SKILLS_TMP"
+fi
+
 # First boot: generate TinyClaw settings if they don't exist
 if [ ! -f "$HOME/.tinyclaw/settings.json" ]; then
     echo "First boot detected — running TinyClaw setup..."

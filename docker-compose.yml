@@ -14,6 +14,8 @@ services:
       - claude-code-bashhistory:/commandhistory
       # Share Claude config with host
       - ${HOST_HOME}/.claude:${HOST_HOME}/.claude:cached
+      # Share Codex config with host (auth + settings persist across rebuilds)
+      - ${HOST_HOME}/.codex:${HOST_HOME}/.codex:cached
       # Docker socket (platform-detected by setup.sh)
       - ${DOCKER_SOCK}:/var/run/docker.sock
       # Git identity and SSH keys from host
@@ -21,6 +23,10 @@ services:
       - ${HOST_HOME}/.ssh:${HOST_HOME}/.ssh:ro
       # TinyClaw state persistence (settings, SQLite queue, sender data)
       - tinyclaw-data:${HOST_HOME}/.tinyclaw
+      # Host polymarket CLI binary
+      - ${HOST_HOME}/.cargo/bin/polymarket:/usr/local/bin/polymarket:ro
+      # Host hypecli binary (Hyperliquid CLI from infinitefield/hypersdk)
+      - ${HOST_HOME}/.cargo/bin/hypecli:/usr/local/bin/hypecli:ro
       # Catch stray writes to /home/node (container user's actual home)
       - node-home-data:/home/node
     ports:

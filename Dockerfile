@@ -138,9 +138,14 @@ RUN npm install -g \
 # The installer puts the binary in ~/.local/bin/claude (node user's home)
 # We copy to /usr/local/bin so it survives volume mounts
 # Bump CLAUDE_CACHE_BUST to force re-download of latest version on rebuild
-ARG CLAUDE_CACHE_BUST=1
+ARG CLAUDE_CACHE_BUST=2
 RUN curl -fsSL https://claude.ai/install.sh | bash && \
     sudo cp /home/node/.local/bin/claude /usr/local/bin/claude
+
+# Install OpenAI Codex CLI (sibling agent — runs alongside Claude in the same container)
+# Bump CODEX_CACHE_BUST to force re-install of latest version on rebuild
+ARG CODEX_CACHE_BUST=1
+RUN npm install -g @openai/codex
 
 # Install TinyClaw for multi-agent orchestration
 # Installed to /opt/tinyclaw (safe from volume mount clobbering)
