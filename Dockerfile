@@ -97,7 +97,25 @@ ENV CARGO_HOME=${HOST_HOME}/.cargo
 ENV RUSTUP_HOME=${HOST_HOME}/.cargo
 
 # Install Rust via rustup (as node user)
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+# Default profile already includes rustc, cargo, rust-std, rust-docs, clippy, rustfmt.
+# Add rust-src + rust-analyzer for full IDE/LSP support.
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable && \
+    "${CARGO_HOME}/bin/rustup" component add rust-src rust-analyzer
+
+# Make Rust available in EVERY shell, not just non-login ones.
+# Login shells (bash -l, ssh, some agent harnesses) reset PATH via /etc/profile
+# and would otherwise lose ~/.cargo/bin. Two redundant guarantees:
+#   1. /etc/profile.d/rust.sh — sourced by all login shells (sh/bash)
+#   2. symlinks in /usr/local/bin — always on the default PATH, even with no
+#      profile sourced at all (rustup proxies resolve the toolchain via the
+#      CARGO_HOME/RUSTUP_HOME env baked into the image)
+RUN echo 'export CARGO_HOME="'"${CARGO_HOME}"'"' | sudo tee /etc/profile.d/rust.sh >/dev/null && \
+    echo 'export RUSTUP_HOME="'"${RUSTUP_HOME}"'"' | sudo tee -a /etc/profile.d/rust.sh >/dev/null && \
+    echo 'case ":$PATH:" in *":'"${CARGO_HOME}"'/bin:"*) ;; *) export PATH="'"${CARGO_HOME}"'/bin:$PATH" ;; esac' | sudo tee -a /etc/profile.d/rust.sh >/dev/null && \
+    sudo chmod 0644 /etc/profile.d/rust.sh && \
+    for t in cargo rustc rustup rustfmt rustdoc cargo-clippy clippy-driver cargo-fmt rust-analyzer; do \
+        sudo ln -sf "${CARGO_HOME}/bin/$t" "/usr/local/bin/$t"; \
+    done
 
 # Install uv for Python project management (as node user)
 # UV_INSTALL_DIR sets the directory for the binary
@@ -137,14 +155,18 @@ RUN npm install -g \
 # Install Claude Code using native installer (npm method is deprecated)
 # The installer puts the binary in ~/.local/bin/claude (node user's home)
 # We copy to /usr/local/bin so it survives volume mounts
-# Bump CLAUDE_CACHE_BUST to force re-download of latest version on rebuild
+# CLAUDE_CACHE_BUST invalidates this layer so the installer always fetches the
+# latest version. `claude-build` passes a fresh timestamp on every build, so a
+# normal rebuild re-pulls Claude Code without busting the rest of the image.
+# `latest` pins to the bleeding-edge channel (install.sh defaults to stable,
+# which lags behind).
 ARG CLAUDE_CACHE_BUST=2
-RUN curl -fsSL https://claude.ai/install.sh | bash && \
+RUN curl -fsSL https://claude.ai/install.sh | bash -s latest && \
     sudo cp /home/node/.local/bin/claude /usr/local/bin/claude
 
 # Install OpenAI Codex CLI (sibling agent — runs alongside Claude in the same container)
 # Bump CODEX_CACHE_BUST to force re-install of latest version on rebuild
-ARG CODEX_CACHE_BUST=1
+ARG CODEX_CACHE_BUST=2
 RUN npm install -g @openai/codex
 
 # Install TinyClaw for multi-agent orchestration

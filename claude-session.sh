@@ -21,6 +21,27 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPOS_DIR="$(dirname "$SCRIPT_DIR")"
 COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
 
+# Optional overrides (set by sibling launchers like fable-session.sh):
+#   CS_MODEL   — passed as `claude --model <CS_MODEL>` (empty = default model)
+#   CS_SUFFIX  — appended to every tmux session name so variants coexist (e.g. ~fable)
+# Defaults keep plain `cs` behavior unchanged.
+CS_MODEL="${CS_MODEL:-}"
+CS_SUFFIX="${CS_SUFFIX:-}"
+
+if [ -n "$CS_MODEL" ]; then
+    LAUNCH_CMD="claude --model $CS_MODEL --dangerously-skip-permissions"
+else
+    LAUNCH_CMD="claude --dangerously-skip-permissions"
+fi
+
+# Build the env prefix that binds a session to a shared notebook topic.
+# The notebook-context.sh SessionStart hook reads $NB_TOPIC to surface the
+# shared file and the session's role. No topic → no prefix (behavior unchanged).
+topic_env() {
+    local topic="$1"
+    [ -n "$topic" ] && printf "NB_TOPIC='%s' " "$topic"
+}
+
 # Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -37,22 +58,42 @@ ensure_container() {
 
 list_sessions() {
     ensure_container
-    echo -e "${BLUE}Active Claude sessions:${NC}"
+    # When launched as a suffixed variant (e.g. fb → ~fable), only show that
+    # variant's sessions. Plain `cs` (no suffix) shows the unsuffixed Claude
+    # sessions and hides ~codex/~fable siblings.
+    if [ -n "$CS_SUFFIX" ]; then
+        echo -e "${BLUE}Active Claude sessions (${CS_SUFFIX}):${NC}"
+    else
+        echo -e "${BLUE}Active Claude sessions:${NC}"
+    fi
     echo ""
-    docker exec $CONTAINER_NAME tmux list-sessions 2>/dev/null | while read line; do
+    local found=0
+    while IFS= read -r line; do
         session_name=$(echo "$line" | cut -d: -f1)
+        if [ -n "$CS_SUFFIX" ]; then
+            # Show only sessions carrying this suffix
+            [[ "$session_name" == *"$CS_SUFFIX"* ]] || continue
+        else
+            # Plain cs: hide sibling launchers' suffixed sessions
+            [[ "$session_name" == *"~codex"* || "$session_name" == *"~fable"* ]] && continue
+        fi
         created=$(echo "$line" | grep -o '(created [^)]*)')
         echo -e "  ${GREEN}$session_name${NC}  $created"
-    done
-    if [ $? -ne 0 ] || [ -z "$(docker exec $CONTAINER_NAME tmux list-sessions 2>/dev/null)" ]; then
+        found=1
+    done < <(docker exec $CONTAINER_NAME tmux list-sessions 2>/dev/null)
+    if [ "$found" -eq 0 ]; then
         echo -e "  ${YELLOW}No active sessions${NC}"
     fi
     echo ""
-    echo "Attach with: cs <project> [feature]"
+    echo "Attach with: cs <project> [topic]"
 }
 
 kill_session() {
     local session_name=$1
+    # For suffixed variants (e.g. fb), allow the user to omit the suffix
+    if [ -n "$CS_SUFFIX" ] && [[ "$session_name" != *"$CS_SUFFIX"* ]]; then
+        session_name="${session_name}${CS_SUFFIX}"
+    fi
     ensure_container
     if docker exec $CONTAINER_NAME tmux has-session -t "=$session_name" 2>/dev/null; then
         docker exec $CONTAINER_NAME tmux kill-session -t "=$session_name"
@@ -68,9 +109,9 @@ start_or_attach() {
 
     # Build session name
     if [ -n "$feature" ]; then
-        SESSION_NAME="${project}/${feature}"
+        SESSION_NAME="${project}/${feature}${CS_SUFFIX}"
     else
-        SESSION_NAME="$project"
+        SESSION_NAME="${project}${CS_SUFFIX}"
     fi
 
     ensure_container
@@ -90,8 +131,8 @@ start_or_attach() {
     else
         echo -e "${GREEN}Creating new session: $SESSION_NAME${NC}"
         echo -e "${BLUE}Project: $REPOS_DIR/$project${NC}"
-        [ -n "$feature" ] && echo -e "${BLUE}Feature: $feature${NC}"
-        docker exec -it $CONTAINER_NAME tmux new-session -s "$SESSION_NAME" -c "$REPOS_DIR/$project" "claude --dangerously-skip-permissions; zsh"
+        [ -n "$feature" ] && echo -e "${BLUE}Notebook topic: $feature${NC}"
+        docker exec -it $CONTAINER_NAME tmux new-session -s "$SESSION_NAME" -c "$REPOS_DIR/$project" "$(topic_env "$feature")${LAUNCH_CMD}; zsh"
     fi
 }
 
@@ -105,7 +146,7 @@ start_worktree_session() {
         exit 1
     fi
 
-    SESSION_NAME="${project}@${branch}"
+    SESSION_NAME="${project}@${branch}${CS_SUFFIX}"
     WORKTREE_DIR="$REPOS_DIR/${project}-${branch}"
     PROJECT_DIR="$REPOS_DIR/${project}"
 
@@ -143,7 +184,7 @@ start_worktree_session() {
         echo -e "${GREEN}Creating new session: $SESSION_NAME${NC}"
         echo -e "${BLUE}Worktree: $WORKTREE_DIR${NC}"
         echo -e "${BLUE}Branch: $branch${NC}"
-        docker exec -it $CONTAINER_NAME tmux new-session -s "$SESSION_NAME" -c "$WORKTREE_DIR" "claude --dangerously-skip-permissions; zsh"
+        docker exec -it $CONTAINER_NAME tmux new-session -s "$SESSION_NAME" -c "$WORKTREE_DIR" "${LAUNCH_CMD}; zsh"
     fi
 }
 
@@ -176,7 +217,7 @@ remove_worktree() {
 
     WORKTREE_DIR="$REPOS_DIR/${project}-${branch}"
     PROJECT_DIR="$REPOS_DIR/${project}"
-    SESSION_NAME="${project}@${branch}"
+    SESSION_NAME="${project}@${branch}${CS_SUFFIX}"
 
     ensure_container
 
@@ -202,9 +243,9 @@ start_remote() {
 
     # Build session name with ~rc suffix to distinguish from regular sessions
     if [ -n "$feature" ]; then
-        SESSION_NAME="${project}/${feature}~rc"
+        SESSION_NAME="${project}/${feature}${CS_SUFFIX}~rc"
     else
-        SESSION_NAME="${project}~rc"
+        SESSION_NAME="${project}${CS_SUFFIX}~rc"
     fi
 
     ensure_container
@@ -226,7 +267,10 @@ start_remote() {
         echo -e "${BLUE}Project: $REPOS_DIR/$project${NC}"
         [ -n "$feature" ] && echo -e "${BLUE}Feature: $feature${NC}"
         echo -e "${YELLOW}If this is the first time, accept the trust dialog then /exit — remote control will start automatically.${NC}"
-        docker exec -it $CONTAINER_NAME tmux new-session -s "$SESSION_NAME" -c "$REPOS_DIR/$project" "claude && claude remote-control; zsh"
+        # Remote flow runs bare `claude` first (for the trust dialog), only adding --model.
+        local remote_first="claude"
+        [ -n "$CS_MODEL" ] && remote_first="claude --model $CS_MODEL"
+        docker exec -it $CONTAINER_NAME tmux new-session -s "$SESSION_NAME" -c "$REPOS_DIR/$project" "$(topic_env "$feature")${remote_first} && claude remote-control; zsh"
     fi
 }
 

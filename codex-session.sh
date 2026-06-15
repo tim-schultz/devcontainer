@@ -32,6 +32,28 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPOS_DIR="$(dirname "$SCRIPT_DIR")"
 COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
 
+# Env prefix that binds a session to a shared notebook topic. Codex does not fire
+# Claude's SessionStart hook, so the topic also drives a bootstrap prompt (below);
+# NB_TOPIC is exported for parity and any topic-aware tooling Codex may run.
+topic_env() {
+    local topic="$1"
+    [ -n "$topic" ] && printf "NB_TOPIC='%s' " "$topic"
+}
+
+# Build the Codex launch command for an optional notebook topic. With a topic, an
+# initial prompt tells Codex (the IMPLEMENTER) to read the shared file first and
+# coordinate through it; without one, the plain interactive command is used.
+codex_launch() {
+    local topic="$1"
+    if [ -n "$topic" ]; then
+        local nbfile="$REPOS_DIR/.shared/notebook/${topic}.md"
+        printf '%s "Before doing anything else, read the shared notebook topic file at %s (if it does not exist yet, the planner has not written it — say so). You are the IMPLEMENTER for topic %s: follow the plan there, append progress to the Implementation log section, and keep the status frontmatter current. Coordinate with other sessions only through that file."' \
+            "$CODEX_CMD" "$nbfile" "'$topic'"
+    else
+        printf '%s' "$CODEX_CMD"
+    fi
+}
+
 # Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -109,8 +131,8 @@ start_or_attach() {
     else
         echo -e "${GREEN}Creating new session: $SESSION_NAME${NC}"
         echo -e "${BLUE}Project: $REPOS_DIR/$project${NC}"
-        [ -n "$feature" ] && echo -e "${BLUE}Feature: $feature${NC}"
-        docker exec -it $CONTAINER_NAME tmux new-session -s "$SESSION_NAME" -c "$REPOS_DIR/$project" "$CODEX_CMD; zsh"
+        [ -n "$feature" ] && echo -e "${BLUE}Notebook topic: $feature${NC}"
+        docker exec -it $CONTAINER_NAME tmux new-session -s "$SESSION_NAME" -c "$REPOS_DIR/$project" "$(topic_env "$feature")$(codex_launch "$feature"); zsh"
     fi
 }
 

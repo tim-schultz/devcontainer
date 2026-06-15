@@ -7,6 +7,9 @@ services:
       args:
         TZ: ${TZ:-America/Los_Angeles}
         HOST_HOME: ${HOST_HOME}
+        # Set by `claude-build` to a fresh timestamp so the Claude Code install
+        # layer is re-run on every build, always pulling the latest version.
+        CLAUDE_CACHE_BUST: ${CLAUDE_CACHE_BUST:-2}
     volumes:
       # Mount repos at SAME path as host for session sharing
       - ${REPOS_DIR}:${REPOS_DIR}:cached

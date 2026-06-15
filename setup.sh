@@ -112,16 +112,75 @@ cat > "$CLAUDE_MD" <<EOF
   - Plans and specs: \`$REPOS_DIR/.shared/plans/\`
 - **Project files** stay in their project directory: \`$REPOS_DIR/<project>/\`
 - When referencing files for another person or agent, always use absolute paths under \`$REPOS_DIR/\`
+
+## Shared Notebook (planner → implementer)
+
+- Sessions coordinate through **topic files** in \`$REPOS_DIR/.shared/notebook/<topic>.md\`.
+  A topic is an identifier passed as the 3rd arg to a session launcher (\`fb\`/\`cs\`/\`cx\`),
+  e.g. \`fb polymarket auth-refactor\` binds the session to the \`auth-refactor\` topic.
+- **Roles:** Fable (\`fb\`) is the **planner** — it owns the Goal/Plan sections.
+  Default Claude (\`cs\`) and Codex (\`cx\`) are **implementers** — they read the plan,
+  append to the Implementation log, and advance \`status\`.
+- If your session was started with a topic, the current topic file is injected into your
+  context at startup. Treat that file as the single source of truth and keep it updated.
+- Manage topics with the \`nb\` CLI: \`nb list\`, \`nb new <topic> [goal]\`, \`nb status <topic> <state>\`.
 EOF
 
 # Create shared directories
 mkdir -p "$REPOS_DIR/.shared/plans"
+mkdir -p "$REPOS_DIR/.shared/notebook"
+
+# Generate AGENTS.md (Codex reads this) — Codex ignores Claude's SessionStart hook,
+# so it gets a static pointer to the shared-notebook convention.
+AGENTS_MD="$REPOS_DIR/AGENTS.md"
+cat > "$AGENTS_MD" <<EOF
+# Agents in $REPOS_DIR
+
+## Shared Notebook (planner → implementer)
+
+Sessions coordinate through topic files in \`$REPOS_DIR/.shared/notebook/<topic>.md\`.
+A topic is an identifier passed as the 3rd arg to a session launcher (\`fb\`/\`cs\`/\`cx\`).
+
+- **Fable** (\`fb\`) is the **planner** — owns the Goal/Plan sections.
+- **Codex** (\`cx\`) and **default Claude** (\`cs\`) are **implementers** — read the plan,
+  append to the Implementation log, and advance \`status\`.
+
+If a Codex session was started with a topic, it is asked to read that topic file first.
+Treat the topic file as the single source of truth and keep it updated as you work.
+Manage topics with \`$SCRIPT_DIR/notebook.sh\` (aliased \`nb\`).
+EOF
 
 # Ensure agent config dirs exist on host before docker-compose mounts them
 # (otherwise docker auto-creates them as root-owned)
 mkdir -p "$HOST_HOME/.claude" "$HOST_HOME/.codex"
 
+# Register the shared-notebook SessionStart hook in the user settings.json.
+# Idempotent: merge with jq if available, otherwise print the block to paste.
+SETTINGS_JSON="$HOST_HOME/.claude/settings.json"
+HOOK_CMD="$SCRIPT_DIR/notebook-context.sh"
+if command -v jq >/dev/null 2>&1; then
+    [ -f "$SETTINGS_JSON" ] || echo '{}' > "$SETTINGS_JSON"
+    if jq -e --arg c "$HOOK_CMD" \
+        'any(.hooks.SessionStart[]?.hooks[]?.command; . == $c)' "$SETTINGS_JSON" >/dev/null 2>&1; then
+        echo -e "${GREEN}SessionStart notebook hook already registered${NC}"
+    else
+        tmp="$(mktemp)"
+        jq --arg c "$HOOK_CMD" '
+            .hooks //= {} |
+            .hooks.SessionStart //= [] |
+            .hooks.SessionStart += [{ "matcher": "startup|resume|clear",
+                                      "hooks": [{ "type": "command", "command": $c }] }]
+        ' "$SETTINGS_JSON" > "$tmp" && mv "$tmp" "$SETTINGS_JSON"
+        echo -e "${GREEN}Registered SessionStart notebook hook in $SETTINGS_JSON${NC}"
+    fi
+else
+    echo -e "${YELLOW}jq not found — add this to $SETTINGS_JSON manually under \"hooks\":${NC}"
+    echo '  "SessionStart": [ { "matcher": "startup|resume|clear",'
+    echo "      \"hooks\": [ { \"type\": \"command\", \"command\": \"$HOOK_CMD\" } ] } ]"
+fi
+
 echo -e "${GREEN}Generated CLAUDE.md at $CLAUDE_MD${NC}"
+echo -e "${GREEN}Generated AGENTS.md at $AGENTS_MD${NC}"
 echo ""
 echo -e "${GREEN}Setup complete.${NC} Next steps:"
 echo "  1. source aliases.sh    # Add to ~/.bashrc or ~/.zshrc"
